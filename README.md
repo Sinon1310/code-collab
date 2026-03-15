@@ -58,8 +58,8 @@ client (React + Monaco)  ←── WebSocket ──→  server (Node.js + Socket
 
 ```bash
 # Clone
-git clone https://github.com/Sinon1310/codecollab.git
-cd codecollab
+git clone https://github.com/Sinon1310/code-collab.git
+cd code-collab
 
 # Start server
 cd server
