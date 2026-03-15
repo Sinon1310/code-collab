@@ -5,28 +5,47 @@ import socket from './socket';
 import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
 import UserPanel from './components/UserPanel';
+import Cursors, { getUserColor } from './components/Cursors';
 
 const ROOM_ID = 'room-1'; // hardcoded for now
+
+// Generate a random username
+function generateUsername() {
+  const adjectives = ['Swift', 'Clever', 'Bright', 'Bold', 'Quick', 'Smart', 'Wise'];
+  const nouns = ['Coder', 'Dev', 'Hacker', 'Builder', 'Ninja', 'Wizard', 'Master'];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  return `${adj}${noun}${Math.floor(Math.random() * 100)}`;
+}
 
 function App() {
   const editorRef = useRef(null);
   const isRemoteChange = useRef(false);
+  const cursorUpdateTimeout = useRef(null);
+  
+  const [userName] = useState(() => generateUsername());
+  const [userId] = useState(() => socket.id || Math.random().toString(36).substr(2, 9));
+  const [userColor] = useState(() => getUserColor(userId, 0));
   const [isConnected, setIsConnected] = useState(false);
   const [userCount, setUserCount] = useState(0);
   const [theme, setTheme] = useState('vs-dark');
   const [language, setLanguage] = useState('javascript');
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [showUserPanel, setShowUserPanel] = useState(false);
-  const [users, setUsers] = useState([
-    { id: '1', name: 'You' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [remoteCursors, setRemoteCursors] = useState({});
 
   useEffect(() => {
     // Connection status handlers
     socket.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
-      socket.emit('join-room', ROOM_ID);
+      socket.emit('join-room', { 
+        roomId: ROOM_ID, 
+        userName,
+        userId: socket.id,
+        userColor,
+      });
     });
 
     socket.on('disconnect', () => {
@@ -58,9 +77,37 @@ function App() {
       setUserCount(count);
     });
 
+    // Handle users list updates
+    socket.on('users-update', (usersList) => {
+      setUsers(usersList);
+      setUserCount(usersList.length);
+    });
+
+    // Handle cursor updates from other users
+    socket.on('cursor-update', ({ userId: remoteUserId, position, userName: remoteName, color }) => {
+      setRemoteCursors(prev => ({
+        ...prev,
+        [remoteUserId]: { position, name: remoteName, color }
+      }));
+    });
+
+    // Handle user leaving (remove their cursor)
+    socket.on('user-left', ({ userId: leftUserId }) => {
+      setRemoteCursors(prev => {
+        const newCursors = { ...prev };
+        delete newCursors[leftUserId];
+        return newCursors;
+      });
+    });
+
     // Initial join if already connected
     if (socket.connected) {
-      socket.emit('join-room', ROOM_ID);
+      socket.emit('join-room', { 
+        roomId: ROOM_ID, 
+        userName,
+        userId: socket.id,
+        userColor,
+      });
       setIsConnected(true);
     }
 
@@ -69,6 +116,9 @@ function App() {
       socket.off('disconnect');
       socket.off('code-update');
       socket.off('user-count');
+      socket.off('users-update');
+      socket.off('cursor-update');
+      socket.off('user-left');
     };
   }, []);
 
@@ -78,10 +128,27 @@ function App() {
     
     // Track cursor position
     editor.onDidChangeCursorPosition((e) => {
-      setCursorPosition({
+      const position = {
         lineNumber: e.position.lineNumber,
         column: e.position.column
-      });
+      };
+      setCursorPosition(position);
+
+      // Emit cursor position to other users (debounced)
+      if (cursorUpdateTimeout.current) {
+        clearTimeout(cursorUpdateTimeout.current);
+      }
+      cursorUpdateTimeout.current = setTimeout(() => {
+        if (socket.connected) {
+          socket.emit('cursor-move', {
+            roomId: ROOM_ID,
+            position,
+            userName,
+            userId: socket.id,
+            color: userColor,
+          });
+        }
+      }, 100); // Debounce 100ms to avoid flooding
     });
   };
 
@@ -134,6 +201,9 @@ function App() {
       }}>
         {/* Editor */}
         <div style={{ flex: 1, position: 'relative' }}>
+          {/* Remote Cursors Overlay */}
+          <Cursors cursors={remoteCursors} editorRef={editorRef} />
+          
           <Editor
             height="100%"
             defaultLanguage={language}
@@ -234,6 +304,9 @@ console.log(greet("World"));
           users={users}
           isOpen={showUserPanel}
           onClose={() => setShowUserPanel(false)}
+          socket={socket}
+          roomId={ROOM_ID}
+          userName={userName}
         />
       </div>
       

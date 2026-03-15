@@ -1,7 +1,8 @@
 import { Users, MessageSquare, X } from 'lucide-react';
 import { useState } from 'react';
+import Chat from './Chat';
 
-function UserPanel({ users, isOpen, onClose }) {
+function UserPanel({ users, isOpen, onClose, socket, roomId, userName }) {
   const [activeTab, setActiveTab] = useState('users');
 
   if (!isOpen) return null;
@@ -196,54 +197,7 @@ function UserPanel({ users, isOpen, onClose }) {
           flexDirection: 'column',
           padding: '1rem'
         }}>
-          <div style={{
-            flex: 1,
-            padding: '1rem',
-            background: '#252526',
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            color: '#858585',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid #333'
-          }}>
-            Chat coming in Phase 2! 💬
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Type a message..."
-              disabled
-              style={{
-                flex: 1,
-                padding: '0.75rem',
-                background: '#252526',
-                border: '1px solid #333',
-                borderRadius: '6px',
-                color: '#d4d4d4',
-                fontSize: '0.875rem',
-                outline: 'none'
-              }}
-            />
-            <button
-              disabled
-              style={{
-                padding: '0.75rem 1rem',
-                background: '#667eea',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                cursor: 'not-allowed',
-                fontSize: '0.875rem',
-                opacity: 0.5
-              }}
-            >
-              Send
-            </button>
-          </div>
+          <Chat socket={socket} roomId={roomId} userName={userName} />
         </div>
       )}
     </div>
